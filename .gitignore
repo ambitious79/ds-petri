@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.env
+.venv
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+build/
+dist/
+
+# Output directories
+outputs/
+logs/
+temp/
+cache/
+*.log
+
+# Results
+results/
+auditor_*.json
+results_*.json
