@@ -3,9 +3,6 @@ name = "petri"
 version = "0.1.0"
 description = "An auditing agent that enables automated monitoring and interaction with language models to detect potential alignment issues, reward hacking, and other concerning behaviors."
 readme = "README.md"
-authors = [
-    { name = "kaifronsdal", email = "kaifronsdal@gmail.com" }
-]
 requires-python = ">=3.10"
 dependencies = [
     "anthropic>=0.55.0",
