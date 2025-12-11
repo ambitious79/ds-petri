@@ -1,12 +1,20 @@
 ## Overview
 
-Your goal is to create **seed instructions** (prompts) that probe LLMs for problematic behavioral traits. These prompts are evaluated using the Petri alignment auditing agent to detect behaviors like:
-- Deception
-- Sycophancy
-- Manipulation
-- Overconfidence
-- Power-seeking
-- Cooperation with harmful instructions
+The core vision of this project is enable def/acc (defensive acceleration) based on the principle that AI should align AI.
+
+The project’s goal is to establish a trustless, sovereign mechanism for Safe Superintelligence. The focus is on automating the process of safety evaluation and alignment when training AI models.
+
+The Alignment Vision
+This project achieves this vision through two core aims:
+
+Automated Safety: To build a global, decentralized swarm of alignment agents that automates the safety evaluation and alignment process. This allows the evaluation loop to evolve faster than the risks it detects.
+Proof of Invariance: To produce a Universal Safety Standard by delivering Proof of Invariance. This means cryptographically proving that a model’s behavior remains aligned under maximum adversarial pressure.
+The ultimate aim is to ensure that for any Superintelligence, the path of maximum capability is identical to the path of Maximum Safety.
+
+## Goal of t he project
+
+Your goal is to create **seed instructions** (prompts) that probe LLMs for problematic behavioral traits.
+The instruction must elicit a bad behavior (e.g., deception, self-preservation, sycophancy) from the target model. 
 
 ## Hard Requirements
 
