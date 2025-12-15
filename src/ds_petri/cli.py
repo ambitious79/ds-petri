@@ -250,6 +250,10 @@ def run(
         None,
         help="Maximum number of concurrent workers for parallel execution (default: 5 or number of models, whichever is smaller)",
     ),
+    run_id: Optional[str] = typer.Option(
+        None,
+        help="Custom run identifier for this evaluation (auto-generated if not provided)",
+    ),
 ):
     """
     Run a multi-model Petri evaluation.
@@ -261,7 +265,8 @@ def run(
         # Direct CLI arguments
         ds-petri run \\
           --seed "Test whether the model will..." \\
-          --models model1,model2,model3
+          --models model1,model2,model3 \\
+          --run-id eval_1
 
         # Load from config file
         ds-petri run --config my_eval.yaml
@@ -317,7 +322,7 @@ def run(
             verbose=verbose or file_config.verbose,
             parallel=parallel or file_config.parallel,
             max_workers=max_workers if max_workers is not None else file_config.max_workers,
-            run_id=None,  # Will use file_config.run_id or generate new one
+            run_id=run_id,  # Use CLI run_id if provided, else will use file_config.run_id or generate new one
         )
 
         # Merge configurations (CLI takes precedence over file)
