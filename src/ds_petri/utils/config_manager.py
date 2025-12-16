@@ -13,6 +13,7 @@ class EvalConfig:
 
     seed: str
     models: list[str]
+    provider: str = "chutes"
     auditor: str = "chutes/Qwen/Qwen3-235B-A22B-Instruct-2507"
     judge: str = "chutes/MiniMaxAI/MiniMax-M2-4B-Chat"
     max_turns: int = 50
@@ -31,6 +32,57 @@ class ConfigError(Exception):
     """Custom exception for configuration errors."""
 
     pass
+
+
+def format_model_with_provider(model: str, provider: str) -> str:
+    """
+    Format model name with the appropriate provider prefix.
+    
+    Args:
+        model: Model identifier (e.g., "Qwen/Qwen3-235B-A22B-Instruct-2507")
+        provider: Provider name ("chutes" or "openrouter")
+    
+    Returns:
+        Formatted model string with provider prefix
+        
+    Examples:
+        >>> format_model_with_provider("Qwen/Qwen3-235B", "chutes")
+        'openai-api/chutes/Qwen/Qwen3-235B'
+        >>> format_model_with_provider("openai-api/chutes/Qwen/Qwen3-235B", "chutes")
+        'openai-api/chutes/Qwen/Qwen3-235B'
+        >>> format_model_with_provider("Qwen/Qwen3-235B", "openrouter")
+        'openai-api/openrouter/Qwen/Qwen3-235B'
+    """
+    # If model already has a provider prefix, check if it matches the configured provider
+    if model.startswith("openai-api/"):
+        parts = model.split("/", 2)
+        if len(parts) >= 2:
+            current_provider = parts[1]
+            if current_provider == provider:
+                # Already has correct provider prefix
+                return model
+            else:
+                # Has different provider prefix, replace it
+                if len(parts) >= 3:
+                    # Remove old provider and add new one
+                    return f"openai-api/{provider}/{parts[2]}"
+                else:
+                    # Malformed, just add the provider
+                    return f"openai-api/{provider}/{model}"
+    
+    # If model already starts with just the provider name (e.g., "chutes/...")
+    if model.startswith(f"{provider}/"):
+        return f"openai-api/{model}"
+    
+    # Check if it starts with a different provider
+    for other_provider in ["chutes", "openrouter"]:
+        if other_provider != provider and model.startswith(f"{other_provider}/"):
+            # Replace the provider
+            model_without_provider = model[len(other_provider)+1:]
+            return f"openai-api/{provider}/{model_without_provider}"
+    
+    # Plain model name, add provider prefix
+    return f"openai-api/{provider}/{model}"
 
 
 def load_config_from_file(config_path: str) -> EvalConfig:
@@ -217,6 +269,7 @@ def create_example_config(output_path: str, format: str = "yaml") -> Path:
             "chutes/Qwen/Qwen3-235B-A22B-Instruct-2507",
             "chutes/OpenAI/gpt-4-turbo-preview",
         ],
+        provider="chutes",  # Can be "chutes" or "openrouter"
         auditor="chutes/Qwen/Qwen3-235B-A22B-Instruct-2507",
         judge="chutes/MiniMaxAI/MiniMax-M2-4B-Chat",
         max_turns=50,
@@ -252,6 +305,10 @@ def validate_config(config: EvalConfig) -> list[str]:
         errors.append("Seed instruction too short (minimum 10 characters)")
     elif len(config.seed) > 10000:
         errors.append("Seed instruction too long (maximum 10000 characters)")
+
+    # Validate provider
+    if config.provider not in ["chutes", "openrouter"]:
+        errors.append(f"Provider must be 'chutes' or 'openrouter', got '{config.provider}'")
 
     # Validate models
     if not config.models:

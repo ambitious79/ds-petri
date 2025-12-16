@@ -31,6 +31,7 @@ from ds_petri.utils.config_manager import (
     merge_configs,
     validate_config,
     create_example_config,
+    format_model_with_provider,
 )
 
 app = typer.Typer(help="Astro-Petri: Orchestrate multi-model Petri audits")
@@ -86,7 +87,8 @@ def show_config(
         print(f"\nTarget models ({len(config.models)}):")
         for i, model in enumerate(config.models, 1):
             print(f"  {i}. {model}")
-        print(f"\nAuditor: {config.auditor}")
+        print(f"\nProvider: {config.provider}")
+        print(f"Auditor: {config.auditor}")
         print(f"Judge: {config.judge}")
         print(f"Max turns: {config.max_turns}")
         print(f"Output directory: {config.output_dir}")
@@ -116,6 +118,10 @@ def save_config(
     output: str = typer.Option(
         "config.yaml",
         help="Path where to save configuration (auto-detects .yaml or .json)",
+    ),
+    provider: str = typer.Option(
+        "chutes",
+        help="Provider for model API (chutes or openrouter)",
     ),
     auditor: str = typer.Option(
         "chutes/Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -170,6 +176,7 @@ def save_config(
         config = EvalConfig(
             seed=seed,
             models=model_list,
+            provider=provider,
             auditor=auditor,
             judge=judge,
             max_turns=max_turns,
@@ -205,6 +212,10 @@ def run(
     models: str = typer.Option(
         None,
         help="Comma-separated list of target model paths",
+    ),
+    provider: str = typer.Option(
+        None,
+        help="Provider for model API (chutes or openrouter)",
     ),
     auditor: str = typer.Option(
         None,
@@ -296,6 +307,7 @@ def run(
             file_config = EvalConfig(
                 seed="",
                 models=[],
+                provider="chutes",
                 auditor="chutes/Qwen/Qwen3-235B-A22B-Instruct-2507",
                 judge="chutes/MiniMaxAI/MiniMax-M2-4B-Chat",
                 max_turns=50,
@@ -312,6 +324,7 @@ def run(
         cli_config = EvalConfig(
             seed=seed or "",
             models=[m.strip() for m in (models or "").split(",") if m.strip()] if models else [],
+            provider=provider or file_config.provider,
             auditor=auditor or file_config.auditor,
             judge=judge or file_config.judge,
             max_turns=max_turns if max_turns is not None else file_config.max_turns,
@@ -339,6 +352,7 @@ def run(
         # Use final configuration
         seed = final_config.seed
         models_str = ",".join(final_config.models)
+        provider = final_config.provider
         auditor = final_config.auditor
         judge = final_config.judge
         max_turns = final_config.max_turns
@@ -388,14 +402,25 @@ def run(
             raise typer.Exit(code=1)
 
         logger.info(f"✓ Validation passed: {len(model_list)} models")
+        print(f"    ✓ Provider: {provider}")
         print(f"    ✓ {len(model_list)} models to evaluate")
         print(f"    ✓ Auditor: {validated_auditor}")
         print(f"    ✓ Judge: {validated_judge}")
         print(f"    ✓ Max turns: {validated_max_turns}")
         print(f"    ✓ Execution mode: {'Parallel' if parallel else 'Sequential'}")
 
+        # Format models with provider prefix
+        formatted_models = [format_model_with_provider(model, provider) for model in model_list]
+        formatted_auditor = format_model_with_provider(validated_auditor, provider)
+        formatted_judge = format_model_with_provider(validated_judge, provider)
+        
+        logger.info(f"Formatted models with provider '{provider}'")
+        for original, formatted in zip(model_list, formatted_models):
+            if original != formatted:
+                logger.debug(f"  {original} -> {formatted}")
+
         # Log evaluation start
-        log_eval_start(logger, model_list, validated_seed)
+        log_eval_start(logger, formatted_models, validated_seed)
 
         # Create seed instruction file
         print("\n[*] Creating seed instruction file...")
@@ -406,12 +431,12 @@ def run(
         # Create checkpoint
         checkpoint = create_checkpoint(
             run_id=run_id,
-            models=model_list,
+            models=formatted_models,
             completed_models=[],
             failed_models={},
             seed_file=seed_file,
-            auditor=validated_auditor,
-            judge=validated_judge,
+            auditor=formatted_auditor,
+            judge=formatted_judge,
             max_turns=validated_max_turns,
             output_dir=validated_output_dir,
         )
@@ -420,15 +445,15 @@ def run(
 
         # Run Petri evaluations (sequential or parallel)
         execution_mode = "parallel" if parallel else "sequential"
-        print(f"\n[*] Running {len(model_list)} Petri evaluations ({execution_mode})...")
+        print(f"\n[*] Running {len(formatted_models)} Petri evaluations ({execution_mode})...")
         start_time = time.time()
 
         if parallel:
             eval_results = run_parallel_evals(
                 seed_instruction_file=seed_file,
-                target_models=model_list,
-                auditor_model=validated_auditor,
-                judge_model=validated_judge,
+                target_models=formatted_models,
+                auditor_model=formatted_auditor,
+                judge_model=formatted_judge,
                 max_turns=validated_max_turns,
                 output_dir=validated_output_dir,
                 logger=logger,
@@ -438,9 +463,9 @@ def run(
         else:
             eval_results = run_sequential_evals(
                 seed_instruction_file=seed_file,
-                target_models=model_list,
-                auditor_model=validated_auditor,
-                judge_model=validated_judge,
+                target_models=formatted_models,
+                auditor_model=formatted_auditor,
+                judge_model=formatted_judge,
                 max_turns=validated_max_turns,
                 output_dir=validated_output_dir,
                 logger=logger,
@@ -518,7 +543,7 @@ def run(
 
         # Parse results from output JSON files
         print("\n[*] Parsing results from transcripts...")
-        transcripts, parsing_errors = collect_transcripts(validated_output_dir, run_identifiers=model_list, run_id=run_id)
+        transcripts, parsing_errors = collect_transcripts(validated_output_dir, run_identifiers=formatted_models, run_id=run_id)
 
         logger.info(f"Parsed {len(transcripts)} successful transcripts")
         if len(transcripts) > 0:
@@ -586,8 +611,8 @@ def run(
                 json_path = export_json_results(
                     transcripts=transcripts,
                     seed_description=validated_seed,
-                    auditor_model=validated_auditor,
-                    judge_model=validated_judge,
+                    auditor_model=formatted_auditor,
+                    judge_model=formatted_judge,
                     max_turns=validated_max_turns,
                     output_file=json_output_path,
                     run_id=None,  # Don't override the filename when explicitly specified
